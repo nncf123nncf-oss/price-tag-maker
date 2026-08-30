@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>値札・プライスカード印刷メーカー</title>
+<style>
+  :root {
+    --bg: #F0E6C8;
+    --surface: #FFFFFF;
+    --text-main: #3B2F1E;
+    --text-sub: #8A7A5C;
+    --accent: #B8862B;
+    --danger: #C0392B;
+    --border: #E0D3A8;
+    --mm: 3.7795275591px; /* 1mm at 96dpi */
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text-main);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  main {
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: 18px;
+    margin: 0;
+  }
+
+  p.lead {
+    margin: 0;
+    color: var(--text-sub);
+    font-size: 14px;
+  }
+
+  label {
+    display: block;
+    font-size: 14px;
+    color: var(--text-sub);
+    margin-bottom: 8px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 8px;
+    font-size: 16px;
+    font-family: system-ui, sans-serif;
+    color: var(--text-main);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    resize: vertical;
+  }
+
+  .size-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+  }
+
+  .size-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--text-main);
+    font-size: 16px;
+  }
+
+  #errorLine {
+    color: var(--danger);
+    font-size: 14px;
+    display: none;
+  }
+
+  #errorLine.show {
+    display: block;
+  }
+
+  button {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 16px;
+    font-size: 16px;
+    font-family: system-ui, sans-serif;
+    color: #FFFFFF;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  button:active {
+    opacity: 0.85;
+  }
+
+  #previewOuter {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    overflow-x: auto;
+    padding: 8px;
+  }
+
+  #previewWrapper {
+    overflow: hidden;
+  }
+
+  #previewInner {
+    transform-origin: top left;
+  }
+
+  .a4-page {
+    background: #FFFFFF;
+    box-shadow: 0 0 0 1px var(--border);
+    box-sizing: border-box;
+    padding: calc(10 * var(--mm));
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .a4-page.page-break::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    border-bottom: 2px dashed var(--border);
+  }
+
+  .card-grid {
+    display: grid;
+    gap: calc(4 * var(--mm));
+    align-content: start;
+  }
+
+  .price-card {
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: calc(3 * var(--mm));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .price-card .name {
+    color: var(--text-main);
+    font-weight: bold;
+    overflow-wrap: break-word;
+    width: 100%;
+  }
+
+  .price-card .price {
+    color: var(--accent);
+    font-weight: bold;
+    margin-top: 4px;
+  }
+
+  .card-grid.size-large .price-card .name { font-size: calc(6 * var(--mm)); }
+  .card-grid.size-large .price-card .price { font-size: calc(9 * var(--mm)); }
+  .card-grid.size-small .price-card .name { font-size: calc(4 * var(--mm)); }
+  .card-grid.size-small .price-card .price { font-size: calc(6 * var(--mm)); }
+
+  #pageCount {
+    font-size: 14px;
+    color: var(--text-sub);
+  }
+
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    #previewOuter, #previewOuter * {
+      visibility: visible;
+    }
+    body, main {
+      margin: 0;
+      padding: 0;
+      background: #FFFFFF;
+    }
+    #previewOuter {
+      border: none;
+      padding: 0;
+      overflow: visible;
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    #previewWrapper {
+      width: auto !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    #previewInner {
+      transform: none !important;
+    }
+    .a4-page {
+      box-shadow: none;
+      margin: 0;
+      page-break-after: always;
+      width: 210mm !important;
+      height: 297mm !important;
+      padding: 10mm;
+    }
+    .a4-page:last-child {
+      page-break-after: auto;
+    }
+    .a4-page.page-break::after {
+      content: none;
+    }
+    @page {
+      size: A4;
+      margin: 0;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>値札・プライスカード印刷メーカー</h1>
+  <p class="lead">「商品名,価格」を1行ずつ入力すると、A4に敷き詰めた値札の印刷プレビューができます。</p>
+
+  <div>
+    <label for="itemsInput">商品名と価格（1行に1商品）</label>
+    <textarea id="itemsInput" placeholder="例: りんご,300"></textarea>
+  </div>
+
+  <div class="size-toggle">
+    <label><input type="radio" name="cardSize" value="large" checked> カード大</label>
+    <label><input type="radio" name="cardSize" value="small"> カード小</label>
+  </div>
+
+  <div id="errorLine"></div>
+
+  <button id="updateBtn" type="button">プレビューを更新</button>
+
+  <div>
+    <div id="pageCount"></div>
+    <div id="previewOuter">
+      <div id="previewWrapper">
+        <div id="previewInner"></div>
+      </div>
+    </div>
+  </div>
+
+  <button id="printBtn" type="button">印刷する</button>
+</main>
+
+<script>
+(function () {
+  var itemsInput = document.getElementById('itemsInput');
+  var errorLine = document.getElementById('errorLine');
+  var updateBtn = document.getElementById('updateBtn');
+  var printBtn = document.getElementById('printBtn');
+  var previewOuter = document.getElementById('previewOuter');
+  var previewWrapper = document.getElementById('previewWrapper');
+  var previewInner = document.getElementById('previewInner');
+  var pageCountEl = document.getElementById('pageCount');
+
+  var MM = 3.7795275591; // px per mm at 96dpi
+  var A4_W_MM = 210, A4_H_MM = 297, MARGIN_MM = 10, GAP_MM = 4;
+
+  var CARD_SIZES = {
+    large: { w: 85, h: 55 },
+    small: { w: 55, h: 35 }
+  };
+
+  var lastScale = 1;
+
+  function getCardSize() {
+    var checked = document.querySelector('input[name="cardSize"]:checked');
+    return checked ? checked.value : 'large';
+  }
+
+  // 1行を「商品名,価格」としてパースする。カンマ優先、なければTAB。
+  function parseLines(raw) {
+    var lines = raw.split(/\r\n|\r|\n/);
+    var items = [];
+    var skipped = 0;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.trim() === '') continue;
+
+      var parts;
+      if (line.indexOf(',') !== -1) {
+        parts = line.split(',');
+      } else if (line.indexOf('\t') !== -1) {
+        parts = line.split('\t');
+      } else {
+        skipped++;
+        continue;
+      }
+
+      if (parts.length < 2) {
+        skipped++;
+        continue;
+      }
+
+      var name = parts[0].trim();
+      var priceRaw = parts[1].trim().replace(/[¥,\s]/g, '');
+      var price = Number(priceRaw);
+
+      if (name === '' || priceRaw === '' || isNaN(price)) {
+        skipped++;
+        continue;
+      }
+
+      items.push({ name: name, price: price });
+    }
+
+    return { items: items, skipped: skipped };
+  }
+
+  function buildPages(items, sizeKey) {
+    var card = CARD_SIZES[sizeKey];
+    var contentW = A4_W_MM - MARGIN_MM * 2;
+    var contentH = A4_H_MM - MARGIN_MM * 2;
+
+    var cols = Math.max(1, Math.floor((contentW + GAP_MM) / (card.w + GAP_MM)));
+    var rows = Math.max(1, Math.floor((contentH + GAP_MM) / (card.h + GAP_MM)));
+    var perPage = cols * rows;
+
+    var pages = [];
+    for (var i = 0; i < items.length; i += perPage) {
+      pages.push(items.slice(i, i + perPage));
+    }
+    if (pages.length === 0) pages.push([]);
+
+    return { pages: pages, cols: cols, card: card };
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render() {
+    var raw = itemsInput.value;
+
+    if (raw.trim() === '') {
+      showError('商品名と価格を1行以上入力してください');
+      previewInner.innerHTML = '';
+      previewWrapper.style.width = '0px';
+      previewWrapper.style.height = '0px';
+      pageCountEl.textContent = '';
+      return;
+    }
+
+    var parsed = parseLines(raw);
+
+    if (parsed.items.length === 0) {
+      showError('有効な行がありません（「商品名,価格」の形式で入力してください）');
+      previewInner.innerHTML = '';
+      previewWrapper.style.width = '0px';
+      previewWrapper.style.height = '0px';
+      pageCountEl.textContent = '';
+      return;
+    }
+
+    if (parsed.skipped > 0) {
+      showError(parsed.skipped + '行を読み取れなかったためスキップしました');
+    } else {
+      hideError();
+    }
+
+    var sizeKey = getCardSize();
+    var built = buildPages(parsed.items, sizeKey);
+
+    var html = '';
+    for (var p = 0; p < built.pages.length; p++) {
+      var isLast = (p === built.pages.length - 1);
+      html += '<div class="a4-page' + (isLast ? '' : ' page-break') + '" style="width:' + (A4_W_MM * MM) + 'px;height:' + (A4_H_MM * MM) + 'px;">';
+      html += '<div class="card-grid size-' + (sizeKey === 'large' ? 'large' : 'small') + '" style="grid-template-columns: repeat(' + built.cols + ', ' + (built.card.w * MM) + 'px);">';
+      for (var c = 0; c < built.pages[p].length; c++) {
+        var item = built.pages[p][c];
+        html += '<div class="price-card" style="width:' + (built.card.w * MM) + 'px;height:' + (built.card.h * MM) + 'px;">';
+        html += '<div class="name">' + escapeHtml(item.name) + '</div>';
+        html += '<div class="price">' + Number(item.price).toLocaleString('ja-JP') + '円</div>';
+        html += '</div>';
+      }
+      html += '</div></div>';
+    }
+
+    previewInner.innerHTML = html;
+    pageCountEl.textContent = '合計 ' + parsed.items.length + '枚 / ' + built.pages.length + 'ページ';
+
+    applyScale();
+  }
+
+  function showError(msg) {
+    errorLine.textContent = msg;
+    errorLine.classList.add('show');
+  }
+
+  function hideError() {
+    errorLine.textContent = '';
+    errorLine.classList.remove('show');
+  }
+
+  function applyScale() {
+    var containerWidth = previewOuter.clientWidth - 16; // padding分を引く
+    if (containerWidth <= 0) {
+      // コンテナ幅0（非表示等）のときは直前のscaleを保持してスキップ
+      previewInner.style.transform = 'scale(' + lastScale + ')';
+      return;
+    }
+
+    var actualWidth = A4_W_MM * MM;
+    var scale = containerWidth / actualWidth;
+    if (!isFinite(scale) || scale <= 0) {
+      scale = lastScale > 0 ? lastScale : 0.3;
+    }
+    // 過度な拡大はしない（画面上はあくまで縮小プレビュー）
+    scale = Math.min(scale, 1);
+
+    lastScale = scale;
+
+    var pages = previewInner.querySelectorAll('.a4-page');
+    var totalHeightMm = pages.length * A4_H_MM + Math.max(0, pages.length - 1) * (12 / MM);
+    var actualHeightPx = previewInner.scrollHeight || (A4_H_MM * MM * pages.length);
+
+    previewInner.style.transform = 'scale(' + scale + ')';
+    previewWrapper.style.width = (actualWidth * scale) + 'px';
+    previewWrapper.style.height = (actualHeightPx * scale) + 'px';
+  }
+
+  updateBtn.addEventListener('click', render);
+  printBtn.addEventListener('click', function () {
+    window.print();
+  });
+  window.addEventListener('resize', function () {
+    applyScale();
+  });
+
+  // 初期表示
+  itemsInput.value = 'りんご,300\nみかん,150\nいちご,500';
+  render();
+})();
+</script>
+</body>
+</html>
