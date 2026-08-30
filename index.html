@@ -191,24 +191,24 @@
   }
 
   @media print {
-    body * {
-      visibility: hidden;
-    }
-    #previewOuter, #previewOuter * {
-      visibility: visible;
-    }
     body, main {
       margin: 0;
       padding: 0;
       background: #FFFFFF;
     }
+    /* previewSection以外は印刷しない。display:noneでレイアウトからも除去し、
+       余分な空白ページが発生しないようにする（visibility:hiddenは要素が場所を
+       占有したままになり空白ページの原因になるため使わない） */
+    main > *:not(#printSection) {
+      display: none;
+    }
+    #pageCount {
+      display: none;
+    }
     #previewOuter {
       border: none;
       padding: 0;
       overflow: visible;
-      position: absolute;
-      left: 0;
-      top: 0;
     }
     #previewWrapper {
       width: auto !important;
@@ -258,7 +258,7 @@
 
   <button id="updateBtn" type="button">プレビューを更新</button>
 
-  <div>
+  <div id="printSection">
     <div id="pageCount"></div>
     <div id="previewOuter">
       <div id="previewWrapper">
@@ -306,26 +306,21 @@
       var line = lines[i];
       if (line.trim() === '') continue;
 
-      var parts;
-      if (line.indexOf(',') !== -1) {
-        parts = line.split(',');
-      } else if (line.indexOf('\t') !== -1) {
-        parts = line.split('\t');
-      } else {
+      // 最初の区切り文字だけで2分割する（「りんご,1,200」のような桁区切り価格を壊さないため）
+      var commaIdx = line.indexOf(',');
+      var tabIdx = line.indexOf('\t');
+      var sepIdx = commaIdx !== -1 ? commaIdx : tabIdx;
+
+      if (sepIdx === -1) {
         skipped++;
         continue;
       }
 
-      if (parts.length < 2) {
-        skipped++;
-        continue;
-      }
-
-      var name = parts[0].trim();
-      var priceRaw = parts[1].trim().replace(/[¥,\s]/g, '');
+      var name = line.slice(0, sepIdx).trim();
+      var priceRaw = line.slice(sepIdx + 1).trim().replace(/[¥,\s]/g, '');
       var price = Number(priceRaw);
 
-      if (name === '' || priceRaw === '' || isNaN(price)) {
+      if (name === '' || priceRaw === '' || isNaN(price) || price < 0 || !isFinite(price)) {
         skipped++;
         continue;
       }
@@ -442,7 +437,6 @@
     lastScale = scale;
 
     var pages = previewInner.querySelectorAll('.a4-page');
-    var totalHeightMm = pages.length * A4_H_MM + Math.max(0, pages.length - 1) * (12 / MM);
     var actualHeightPx = previewInner.scrollHeight || (A4_H_MM * MM * pages.length);
 
     previewInner.style.transform = 'scale(' + scale + ')';
